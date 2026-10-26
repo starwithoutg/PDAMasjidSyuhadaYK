@@ -68,11 +68,19 @@ def row_to_record(sheet_name: str, row: dict) -> dict | None:
     body = " | ".join(parts)
     source_id = clean_value(row.get("source_id")) or clean_value(row.get("record_id"))
     source_title = clean_value(row.get("dc:source")) or clean_value(row.get("source_title")) or sheet_name
+    # Workbook columns sometimes contain trailing spaces (for example, "doc_url ").
+    doc_url = next((clean_value(v) for k, v in row.items()
+                    if str(k).strip().lower() in {"doc_url", "document_url", "google_drive_url", "url_gdrive", "source_url"}
+                    and clean_value(v).startswith(("https://", "http://"))), "")
+    if not doc_url:
+        identifier = clean_value(row.get("dc:identifier"))
+        if "drive.google.com/" in identifier or "docs.google.com/" in identifier:
+            doc_url = identifier
     page = clean_value(row.get(cfg["page_col"])) if cfg["page_col"] else ""
     location = clean_value(row.get("room_or_location_code")) or clean_value(row.get("room_location_code")) or clean_value(row.get("location_text"))
     code = clean_value(row.get("element_code")) or clean_value(row.get("damage_code_source"))
     return {"id": rid, "title": title, "kind": cfg["kind"], "sheet": sheet_name, "text": f"{title} {cfg['kind']} {body}",
-            "source_id": source_id, "source_title": source_title, "page": page, "location": location, "code": code, "raw": row}
+            "source_id": source_id, "source_title": source_title, "page": page, "location": location, "code": code, "doc_url": doc_url, "raw": row}
 
 
 @st.cache_data(show_spinner=False)
@@ -93,7 +101,19 @@ def load_records(file_path: str, file_mtime: float):
     unique = {}
     for rec in records:
         unique[(rec["sheet"], rec["id"])] = rec
-    return list(unique.values()), sheet_counts, xls.sheet_names
+    records = list(unique.values())
+    # Resolve document links for RAG chunks and other rows that refer to a source ID.
+    urls_by_source_id, urls_by_source_title = {}, {}
+    for rec in records:
+        if rec.get("doc_url"):
+            if rec.get("source_id"):
+                urls_by_source_id.setdefault(rec["source_id"], rec["doc_url"])
+            if rec.get("source_title"):
+                urls_by_source_title.setdefault(normalize(rec["source_title"]), rec["doc_url"])
+    for rec in records:
+        if not rec.get("doc_url"):
+            rec["doc_url"] = urls_by_source_id.get(rec.get("source_id"), "") or urls_by_source_title.get(normalize(rec.get("source_title", "")), "")
+    return records, sheet_counts, xls.sheet_names
 
 
 def tokenize(text: str):
@@ -349,6 +369,10 @@ for msg in st.session_state.messages:
                 for i, src in enumerate(msg["sources"], 1):
                     st.markdown(f"**[S{i}] {src['title']}**  \n{src['source_title']} · ID `{src['id']}` · Halaman {src['page'] or 'tidak tercantum'}")
                     st.caption(f"Kategori: {src['kind']} · Lokasi: {src['location'] or 'tidak tercantum'} · Status halaman: {src['page_status']}")
+                    if src.get("doc_url"):
+                        st.link_button("Buka dokumen sumber di Google Drive", src["doc_url"], key=f"history_doc_{msg.get('id','')}_{i}_{src['id']}")
+                    else:
+                        st.caption("Tautan dokumen tidak tersedia pada metadata untuk sumber ini.")
 
 question = st.chat_input("Contoh: Apa yang tercatat tentang kerusakan pintu?")
 if question is None and selected_example != "Pilih contoh pertanyaan...":
@@ -365,7 +389,7 @@ if question:
         else: answer = answer_local(question, results, qinfo)
     sources = []
     for r in results:
-        sources.append({"id": r["id"], "title": r["title"], "kind": r["kind"], "source_title": r["source_title"], "page": r["page"], "sheet": r["sheet"], "code": r["code"], "location": r["location"], "page_status": "perlu verifikasi" if "sekitar" in (r["page"] or "").lower() else "tercantum", "score": round(r["score"], 3)})
+        sources.append({"id": r["id"], "title": r["title"], "kind": r["kind"], "source_title": r["source_title"], "page": r["page"], "sheet": r["sheet"], "code": r["code"], "location": r["location"], "doc_url": r.get("doc_url", ""), "page_status": "perlu verifikasi" if "sekitar" in (r["page"] or "").lower() else "tercantum", "score": round(r["score"], 3)})
     with st.chat_message("assistant"):
         st.markdown('<div class="answer-box">', unsafe_allow_html=True)
         st.markdown(answer)
@@ -374,6 +398,10 @@ if question:
             with st.expander(f"Periksa sumber jawaban ({len(sources)})", expanded=True):
                 for i, src in enumerate(sources, 1):
                     st.markdown(f"<div class='source-box'><div class='source-title'>[S{i}] {html.escape(src['title'])}</div><div>{html.escape(src['source_title'])}</div><div class='muted'>ID: {html.escape(src['id'])} · Halaman: {html.escape(src['page'] or 'tidak tercantum')} · {html.escape(src['kind'])}</div></div>", unsafe_allow_html=True)
+                    if src.get("doc_url"):
+                        st.link_button("Buka dokumen sumber di Google Drive", src["doc_url"], key=f"source_doc_{len(st.session_state.messages)}_{i}_{src['id']}")
+                    else:
+                        st.caption("Tautan Google Drive belum tersedia pada rekod ini.")
                     if src["page_status"] == "perlu verifikasi": st.caption("Catatan: nomor halaman pada metadata bersifat perkiraan dan perlu dicek pada PDF asli.")
     st.session_state.messages.append({"role": "assistant", "content": answer, "sources": sources})
 
