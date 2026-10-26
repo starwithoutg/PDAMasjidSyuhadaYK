@@ -6,8 +6,9 @@ Aplikasi Streamlit untuk menelusuri workbook metadata Dublin Core Masjid Syuhada
 
 - Chat UI berbahasa Indonesia.
 - Membaca sheet metadata dokumen, elemen arsitektur, kerusakan, panduan pelestarian, chunk RAG, pemetaan DC, dan controlled vocabulary.
-- Retrieval lokal TF-IDF atau keyword.
-- Sitasi sumber, sheet, ID rekod, dan halaman jika tersedia.
+- Retrieval lokal TF-IDF atau kata kunci dengan pengarahan berdasarkan maksud pertanyaan (jumlah, lokasi, kerusakan, elemen, atau pelestarian).
+- Jawaban lokal yang lebih natural, termasuk hitungan rekod yang memenuhi kriteria pertanyaan.
+- Sitasi sumber, ID rekod, dan halaman jika tersedia, beserta penanda jika halaman masih perkiraan.
 - Unggah workbook lain dari sidebar.
 - OpenAI LLM opsional. API key tidak disimpan di kode.
 
@@ -42,7 +43,7 @@ Jangan commit file `secrets.toml`. File tersebut sudah dikecualikan oleh `.gitig
 
 Anda juga dapat mengatur nama model melalui environment variable `OPENAI_MODEL`. Default di aplikasi adalah `gpt-4o-mini`. Pastikan model tersebut tersedia pada akun API Anda.
 
-Tanpa API key, aplikasi tetap dapat mencari dan menampilkan rekod relevan, tetapi jawaban berupa ringkasan hasil pencarian, bukan generasi LLM.
+Tanpa API key, aplikasi tetap dapat menyusun jawaban ringkas dengan aturan lokal. Untuk pertanyaan jumlah, hitungan dibatasi pada rekod unik yang tersedia di workbook. Untuk pertanyaan lokasi, aplikasi tidak akan menebak lokasi jika metadata tidak menyebutkannya.
 
 ## Deploy ke Streamlit Community Cloud
 
@@ -79,6 +80,7 @@ masjid_syuhada_rag_streamlit/
 ## Penting untuk publikasi
 
 - Workbook saat ini memuat rekod contoh dan sebagian nomor halaman ditandai "sekitar". Verifikasi sumber sebelum dipublikasikan sebagai data resmi.
+- Jumlah yang dijawab aplikasi hanya mencerminkan rekod yang tersedia di workbook, bukan jumlah keseluruhan di lapangan.
 - Aplikasi tidak menggantikan pemeriksaan konservasi oleh tenaga ahli.
 - Jangan mengunggah informasi pribadi, dokumen internal, atau data berhak cipta tanpa izin.
 - TF-IDF merupakan baseline retrieval. Untuk produksi berskala besar, pertimbangkan embedding model, vector database, evaluasi retrieval, dan pengujian jawaban.

@@ -1,6 +1,6 @@
 import os
 import re
-import json
+import html
 from pathlib import Path
 from typing import Any
 
@@ -22,88 +22,40 @@ except Exception:
 APP_DIR = Path(__file__).parent
 DEFAULT_XLSX = APP_DIR / "data" / "Metadata_DCMA_RAG_Masjid_Syuhada.xlsx"
 SHEET_CONFIG = {
-    "Metadata_Dublin_Core": {
-        "kind": "dokumen sumber",
-        "title_cols": ["dc:title", "record_id"],
-        "text_cols": ["dc:description", "dc:subject", "evidence_note", "dc:coverage", "dc:source", "dc:creator"],
-        "id_col": "record_id",
-        "page_col": "pdf_pages",
-    },
-    "Elemen_Arsitektur": {
-        "kind": "elemen arsitektur",
-        "title_cols": ["dc:title", "element_code", "element_id"],
-        "text_cols": ["form_description", "dc:description", "material", "finish", "location_text",
-                      "room_location_code", "quantity", "significance_source_code", "significance_label",
-                      "condition_summary", "dc:subject", "evidence_text", "rag_keywords"],
-        "id_col": "element_id",
-        "page_col": "source_page_pdf",
-    },
-    "Inventarisasi_Kerusakan": {
-        "kind": "rekod kerusakan",
-        "title_cols": ["dc:title", "damage_code_source", "damage_id"],
-        "text_cols": ["element_category", "damage_type", "damage_description", "suspected_cause_source",
-                      "severity", "recommended_action", "building_mass", "room_or_location_code",
-                      "evidence_text", "rag_keywords"],
-        "id_col": "damage_id",
-        "page_col": "source_page_pdf",
-    },
-    "Panduan_Pelestarian": {
-        "kind": "kebijakan pelestarian",
-        "title_cols": ["dc:title", "policy_id"],
-        "text_cols": ["priority_source", "element_or_scope", "recommendation_source_text",
-                      "interpretation_note", "evidence_text", "rag_keywords"],
-        "id_col": "policy_id",
-        "page_col": "source_page_pdf",
-    },
-    "Chunk_RAG": {
-        "kind": "chunk RAG",
-        "title_cols": ["chunk_title", "chunk_id"],
-        "text_cols": ["chunk_text", "keywords", "retrieval_filter_hint"],
-        "id_col": "chunk_id",
-        "page_col": "source_page_pdf",
-    },
-    "Pemetaan_DC": {
-        "kind": "pemetaan Dublin Core",
-        "title_cols": ["dcmi_element"],
-        "text_cols": ["definisi_ringkas", "penggunaan_dalam_proyek", "contoh_nilai", "catatan_validasi"],
-        "id_col": "dcmi_element",
-        "page_col": None,
-    },
-    "Controlled_Vocab": {
-        "kind": "kosakata terkendali",
-        "title_cols": ["field", "value"],
-        "text_cols": ["definition_or_usage", "source_or_rule"],
-        "id_col": "field",
-        "page_col": None,
-    },
+    "Metadata_Dublin_Core": {"kind": "dokumen sumber", "title_cols": ["dc:title", "record_id"], "id_col": "record_id", "page_col": "pdf_pages"},
+    "Elemen_Arsitektur": {"kind": "elemen arsitektur", "title_cols": ["dc:title", "element_code", "element_id"], "id_col": "element_id", "page_col": "source_page_pdf"},
+    "Inventarisasi_Kerusakan": {"kind": "rekod kerusakan", "title_cols": ["dc:title", "damage_code_source", "damage_id"], "id_col": "damage_id", "page_col": "source_page_pdf"},
+    "Panduan_Pelestarian": {"kind": "panduan pelestarian", "title_cols": ["dc:title", "policy_id"], "id_col": "policy_id", "page_col": "source_page_pdf"},
+    "Chunk_RAG": {"kind": "potongan konteks", "title_cols": ["chunk_title", "chunk_id"], "id_col": "chunk_id", "page_col": "source_page_pdf"},
+    "Pemetaan_DC": {"kind": "pemetaan Dublin Core", "title_cols": ["dcmi_element"], "id_col": "dcmi_element", "page_col": None},
+    "Controlled_Vocab": {"kind": "kosakata terkendali", "title_cols": ["field", "value"], "id_col": "field", "page_col": None},
 }
 
-st.set_page_config(
-    page_title="Chatbot Dokumentasi Masjid Syuhada",
-    page_icon="🏛️",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
-
+st.set_page_config(page_title="Dokumentasi Masjid Syuhada", page_icon="🏛️", layout="wide", initial_sidebar_state="expanded")
 st.markdown("""
 <style>
-.block-container {max-width: 1180px; padding-top: 1.7rem;}
-.hero {padding: 1.4rem 1.6rem; border-radius: 16px; background: linear-gradient(120deg,#e7f4f3,#f5f7fb); border: 1px solid #d4e5e5;}
-.hero h1 {margin: 0; color: #164e63; font-size: 2rem;}
-.hero p {margin: .5rem 0 0; color: #334155;}
-.small-muted {font-size: .85rem; color: #64748b;}
-.source-card {border: 1px solid #dbe3ea; border-radius: 10px; padding: .8rem 1rem; margin: .4rem 0;}
+.block-container{max-width:1180px;padding-top:1.35rem;padding-bottom:3rem}
+.hero{padding:1.5rem 1.7rem;border-radius:18px;background:linear-gradient(125deg,#102d3b,#1c5961);color:#fff;margin-bottom:1rem}
+.hero h1{font-size:1.85rem;line-height:1.2;margin:0;color:#fff}
+.hero p{margin:.55rem 0 0;color:#e3f2f3;font-size:1rem;max-width:850px}
+.kicker{font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:#a9d5d6;font-weight:700;margin-bottom:.5rem}
+.info-strip{padding:.8rem 1rem;border:1px solid rgba(128,145,160,.35);border-radius:12px;background:rgba(128,145,160,.07);margin:.8rem 0 1.2rem}
+.answer-box{padding:1rem 1.1rem;border:1px solid rgba(80,150,130,.4);border-radius:13px;background:rgba(80,150,130,.08);margin:.3rem 0 .7rem}
+.source-box{border:1px solid rgba(128,145,160,.3);border-radius:12px;padding:.8rem 1rem;margin:.5rem 0}
+.source-title{font-weight:700;font-size:1rem;margin-bottom:.25rem}
+.muted{color:#8b98a8;font-size:.86rem}
+.stChatMessage{border-radius:14px}
+[data-testid="stMetric"]{border:1px solid rgba(128,145,160,.25);padding:.7rem .85rem;border-radius:12px}
 </style>
-<div class="hero">
-  <h1>Chatbot Dokumentasi Masjid Syuhada</h1>
-  <p>Asisten pencarian berbasis metadata Dublin Core untuk elemen arsitektur, inventarisasi kerusakan, dan panduan pelestarian.</p>
-</div>
+<div class="hero"><div class="kicker">Arsip · Arsitektur · Pelestarian</div><h1>Asisten Dokumentasi Masjid Syuhada</h1><p>Temukan informasi elemen arsitektur, lokasi yang tercatat, kerusakan, dan arahan pelestarian. Setiap jawaban disertai sumber agar mudah diperiksa kembali.</p></div>
 """, unsafe_allow_html=True)
+
 
 def clean_value(value: Any) -> str:
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return ""
     return str(value).strip()
+
 
 def row_to_record(sheet_name: str, row: dict) -> dict | None:
     cfg = SHEET_CONFIG[sheet_name]
@@ -112,275 +64,318 @@ def row_to_record(sheet_name: str, row: dict) -> dict | None:
     if not title:
         return None
     rid = clean_value(row.get(cfg["id_col"])) or f"{sheet_name}-{abs(hash(title)) % 10**8}"
-    parts = []
-    for col, value in row.items():
-        value = clean_value(value)
-        if value and col not in {"doc_url"}:
-            parts.append(f"{col}: {value}")
+    parts = [f"{col}: {clean_value(value)}" for col, value in row.items() if clean_value(value) and col != "doc_url"]
     body = " | ".join(parts)
-    # Build a natural-language searchable text without losing source field names.
-    searchable = " ".join([title, cfg["kind"], body])
-    source_id = clean_value(row.get("source_id")) or clean_value(row.get("record_id")) or ""
+    source_id = clean_value(row.get("source_id")) or clean_value(row.get("record_id"))
     source_title = clean_value(row.get("dc:source")) or clean_value(row.get("source_title")) or sheet_name
     page = clean_value(row.get(cfg["page_col"])) if cfg["page_col"] else ""
-    location = clean_value(row.get("room_location_code")) or clean_value(row.get("location_text"))
+    location = clean_value(row.get("room_or_location_code")) or clean_value(row.get("room_location_code")) or clean_value(row.get("location_text"))
     code = clean_value(row.get("element_code")) or clean_value(row.get("damage_code_source"))
-    return {
-        "id": rid, "title": title, "kind": cfg["kind"], "sheet": sheet_name,
-        "text": searchable, "source_id": source_id, "source_title": source_title,
-        "page": page, "location": location, "code": code, "raw": row,
-    }
+    return {"id": rid, "title": title, "kind": cfg["kind"], "sheet": sheet_name, "text": f"{title} {cfg['kind']} {body}",
+            "source_id": source_id, "source_title": source_title, "page": page, "location": location, "code": code, "raw": row}
+
 
 @st.cache_data(show_spinner=False)
 def load_records(file_path: str, file_mtime: float):
     xls = pd.ExcelFile(file_path)
-    records = []
-    sheet_counts = {}
-    for sheet_name, cfg in SHEET_CONFIG.items():
+    records, sheet_counts = [], {}
+    for sheet_name in SHEET_CONFIG:
         if sheet_name not in xls.sheet_names:
             continue
         df = pd.read_excel(file_path, sheet_name=sheet_name, dtype=object)
         df.columns = [str(c).strip() for c in df.columns]
-        count_before = len(records)
+        before = len(records)
         for row in df.to_dict(orient="records"):
             rec = row_to_record(sheet_name, row)
-            if rec and rec["text"].strip():
+            if rec:
                 records.append(rec)
-        sheet_counts[sheet_name] = len(records) - count_before
-    # Remove duplicates by source sheet and stable record ID.
+        sheet_counts[sheet_name] = len(records) - before
     unique = {}
     for rec in records:
         unique[(rec["sheet"], rec["id"])] = rec
     return list(unique.values()), sheet_counts, xls.sheet_names
 
+
 def tokenize(text: str):
     return re.findall(r"[a-zA-ZÀ-ÿ0-9_.-]+", text.lower())
 
-def keyword_score(query: str, text: str) -> float:
-    q = set(tokenize(query))
-    t = set(tokenize(text))
-    if not q or not t:
-        return 0.0
-    overlap = len(q & t) / max(len(q), 1)
-    phrase_bonus = 0.2 if query.lower() in text.lower() else 0.0
-    return overlap + phrase_bonus
+
+def normalize(text: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^a-zA-ZÀ-ÿ0-9 ]+", " ", str(text).lower())).strip()
+
 
 @st.cache_resource(show_spinner=False)
 def build_tfidf_index(texts: tuple[str, ...]):
     if TfidfVectorizer is None:
         return None, None
-    vectorizer = TfidfVectorizer(ngram_range=(1, 2), strip_accents="unicode", lowercase=True)
-    matrix = vectorizer.fit_transform(list(texts))
-    return vectorizer, matrix
+    vectorizer = TfidfVectorizer(ngram_range=(1, 2), strip_accents="unicode", lowercase=True, sublinear_tf=True)
+    return vectorizer, vectorizer.fit_transform(list(texts))
+
+
+def classify_query(query: str) -> dict:
+    q = normalize(query)
+    intent = "general"
+    if any(x in q for x in ["berapa", "jumlah", "ada berapa", "hitung"]): intent = "count"
+    elif any(x in q for x in ["di mana", "dimana", "lokasi", "letak", "berada di", "terletak"]): intent = "location"
+    elif any(x in q for x in ["kerusakan", "rusak", "retak", "mengelupas", "bocor", "lapuk", "korosi"]): intent = "damage"
+    elif any(x in q for x in ["prioritas", "pelestarian", "konservasi", "perbaikan", "penanganan", "rekomendasi"]): intent = "preservation"
+    elif any(x in q for x in ["material", "bahan", "finishing", "terbuat dari", "bentuk", "ukuran", "signifikansi", "kode"]): intent = "element"
+    target = None
+    for term, synonyms in {
+        "pintu": ["pintu", "daun pintu", "kusen pintu"], "jendela": ["jendela", "kaca jendela"],
+        "atap": ["atap", "dak beton", "kubah", "talang"], "kaca": ["kaca"], "kusen": ["kusen"],
+        "kubah": ["kubah"], "talang": ["talang"],
+    }.items():
+        if any(s in q for s in synonyms):
+            target = term
+            break
+    damage_type = "retak" if "retak" in q else ("mengelupas" if "mengelupas" in q else None)
+    return {"intent": intent, "target": target, "damage_type": damage_type, "query": q}
+
+
+def record_matches_target(rec: dict, target: str | None) -> bool:
+    if not target: return True
+    raw = rec["raw"]
+    fields = " ".join(clean_value(raw.get(k)) for k in ["dc:title", "element_category", "element_type", "damage_type", "damage_description", "dc:subject", "rag_keywords", "element_or_scope", "chunk_text"])
+    f = normalize(fields)
+    aliases = {"pintu": ["pintu"], "jendela": ["jendela"], "atap": ["atap", "dak beton", "kubah", "talang"], "kaca": ["kaca"], "kusen": ["kusen"], "kubah": ["kubah"], "talang": ["talang"]}
+    return any(a in f for a in aliases.get(target, [target]))
+
+
+def record_matches_damage(rec: dict, qinfo: dict) -> bool:
+    if rec["sheet"] != "Inventarisasi_Kerusakan":
+        return False
+    if not record_matches_target(rec, qinfo["target"]): return False
+    if qinfo["damage_type"]:
+        fields = normalize(" ".join(clean_value(rec["raw"].get(k)) for k in ["dc:title", "damage_type", "damage_description", "rag_keywords"]))
+        return qinfo["damage_type"] in fields
+    return True
+
+
+def retrieve(query: str, records: list[dict], top_k: int, mode: str):
+    qinfo = classify_query(query)
+    pool = records
+    # Route by question intent so similar words in unrelated record types do not dominate.
+    if qinfo["intent"] in ("count", "damage"):
+        damage_pool = [r for r in records if r["sheet"] == "Inventarisasi_Kerusakan" and record_matches_target(r, qinfo["target"])]
+        if qinfo["damage_type"]:
+            typed = [r for r in damage_pool if record_matches_damage(r, qinfo)]
+            pool = typed if typed else damage_pool
+        else: pool = damage_pool
+    elif qinfo["intent"] == "location":
+        pool = [r for r in records if r["sheet"] == "Elemen_Arsitektur" and record_matches_target(r, qinfo["target"])]
+        if not pool: pool = [r for r in records if record_matches_target(r, qinfo["target"]) and r["sheet"] in ("Chunk_RAG", "Metadata_Dublin_Core")]
+    elif qinfo["intent"] == "preservation":
+        pool = [r for r in records if r["sheet"] == "Panduan_Pelestarian"]
+    elif qinfo["intent"] == "element":
+        pool = [r for r in records if r["sheet"] == "Elemen_Arsitektur" and record_matches_target(r, qinfo["target"])] or records
+    if not pool: return [], qinfo
+    if mode == "Keyword" or TfidfVectorizer is None:
+        qtokens = set(tokenize(query))
+        ranked = []
+        for r in pool:
+            rtokens = set(tokenize(r["text"]))
+            score = len(qtokens & rtokens) / max(len(qtokens), 1)
+            if qinfo["target"] and record_matches_target(r, qinfo["target"]): score += .45
+            if qinfo["damage_type"] and qinfo["damage_type"] in normalize(r["text"]): score += .4
+            ranked.append((score, r))
+    else:
+        texts = tuple(r["text"] for r in records)
+        vectorizer, matrix = build_tfidf_index(texts)
+        if vectorizer is None: return retrieve(query, records, top_k, "Keyword")
+        qvec = vectorizer.transform([query])
+        all_scores = cosine_similarity(qvec, matrix).ravel()
+        by_key = {(r["sheet"], r["id"]): float(all_scores[i]) for i, r in enumerate(records)}
+        ranked = []
+        for r in pool:
+            score = by_key.get((r["sheet"], r["id"]), 0.0)
+            if qinfo["target"] and record_matches_target(r, qinfo["target"]): score += .35
+            if qinfo["damage_type"] and qinfo["damage_type"] in normalize(r["text"]): score += .3
+            ranked.append((score, r))
+    ranked.sort(key=lambda x: x[0], reverse=True)
+    selected = []
+    for score, rec in ranked:
+        if score <= 0: continue
+        # Avoid showing the same underlying record twice when both source row and RAG chunk exist.
+        parent = clean_value(rec["raw"].get("parent_record_id"))
+        if rec["sheet"] == "Chunk_RAG" and any(x["id"] == parent for x in selected): continue
+        selected.append({"score": float(score), **rec})
+        if len(selected) >= top_k: break
+    return selected, qinfo
+
 
 def get_openai_client():
     api_key = ""
-    try:
-        api_key = st.secrets.get("OPENAI_API_KEY", "")
-    except Exception:
-        pass
+    try: api_key = st.secrets.get("OPENAI_API_KEY", "")
+    except Exception: pass
     api_key = api_key or os.getenv("OPENAI_API_KEY", "")
-    if not api_key or OpenAI is None:
-        return None
+    if not api_key or OpenAI is None: return None
     return OpenAI(api_key=api_key)
 
-def retrieve(query: str, records: list[dict], top_k: int, mode: str):
-    if not records:
-        return []
-    if mode == "Keyword":
-        ranked = [(keyword_score(query, r["text"]), r) for r in records]
-        ranked.sort(key=lambda x: x[0], reverse=True)
-        return [{"score": s, **r} for s, r in ranked[:top_k] if s > 0]
 
-    # TF-IDF is local, no API key required.
-    texts = tuple(r["text"] for r in records)
-    vectorizer, matrix = build_tfidf_index(texts)
-    if vectorizer is None:
-        ranked = [(keyword_score(query, r["text"]), r) for r in records]
-        ranked.sort(key=lambda x: x[0], reverse=True)
-        return [{"score": s, **r} for s, r in ranked[:top_k] if s > 0]
-    q_vec = vectorizer.transform([query])
-    scores = cosine_similarity(q_vec, matrix).ravel()
-    indices = scores.argsort()[::-1][:top_k]
-    return [{"score": float(scores[i]), **records[i]} for i in indices if scores[i] > 0]
+def source_label(rec: dict) -> str:
+    page = rec["page"] or "tidak tercantum"
+    if "sekitar" in page.lower(): page += " (perlu verifikasi)"
+    return f"{rec['source_title']}, halaman {page}"
 
-def answer_with_openai(query: str, retrieved: list[dict], client, model: str):
+
+def answer_local(query: str, results: list[dict], qinfo: dict) -> str:
+    if not results:
+        return "Saya belum menemukan informasi yang cukup untuk menjawab pertanyaan itu di metadata yang tersedia. Coba sebutkan nama elemen, kode, atau jenis kerusakannya."
+    intent, target = qinfo["intent"], qinfo["target"]
+    if intent == "count":
+        exact = [r for r in results if r["sheet"] == "Inventarisasi_Kerusakan" and record_matches_damage(r, qinfo)]
+        if qinfo["damage_type"] and target:
+            label = f"rekod kerusakan {target} dengan kondisi {qinfo['damage_type']}"
+        elif target and qinfo["damage_type"]:
+            label = f"rekod {target} yang mengalami {qinfo['damage_type']}"
+        elif target: label = f"rekod kerusakan yang berkaitan dengan {target}"
+        else: label = "rekod kerusakan yang sesuai dengan pertanyaan"
+        if not exact:
+            return f"Saya belum menemukan rekod yang secara jelas memenuhi kriteria {label} di workbook yang tersedia. Ini tidak membuktikan bahwa kerusakan tersebut tidak ada; data inventarisasi yang dimuat mungkin belum lengkap."
+        names = "; ".join(r["title"] for r in exact)
+        return f"Di workbook yang saat ini dimuat, saya menemukan **{len(exact)} rekod** {label}. Rekod yang cocok: {names}. Angka ini merujuk pada data yang tersedia di aplikasi, bukan jaminan jumlah keseluruhan di lapangan."
+    if intent == "location":
+        useful = [r for r in results if r["sheet"] == "Elemen_Arsitektur"]
+        if not useful:
+            return "Saya belum menemukan lokasi yang dapat dipastikan dari metadata yang tersedia. Rekod yang ditemukan belum menyebut lokasi spesifik untuk elemen yang ditanyakan, jadi saya tidak ingin menebaknya."
+        bits = []
+        for r in useful[:3]:
+            loc = r["location"] or clean_value(r["raw"].get("location_text"))
+            if loc: bits.append(f"**{r['title']}** tercatat di {loc}")
+        if not bits:
+            return "Saya menemukan rekod elemen yang berkaitan, tetapi kolom lokasinya belum terisi. Lokasi perlu diverifikasi pada gambar teknis atau PDF sumber."
+        return "Berdasarkan metadata yang tersedia, " + "; ".join(bits) + ". Saya belum dapat memastikan lokasi yang lebih spesifik daripada keterangan tersebut."
+    if intent in ("damage",):
+        damage = [r for r in results if r["sheet"] == "Inventarisasi_Kerusakan"]
+        if not damage:
+            return "Saya belum menemukan rekod kerusakan yang sesuai di metadata yang tersedia."
+        statements = []
+        for r in damage[:4]:
+            raw = r["raw"]
+            detail = clean_value(raw.get("damage_description")) or clean_value(raw.get("evidence_text"))
+            cause = clean_value(raw.get("suspected_cause_source"))
+            s = f"**{r['title']}**: {detail}"
+            if cause and any(x in cause.lower() for x in ["diduga", "dugaan"]): s += f" Sumber menyebut penyebabnya sebagai dugaan: {cause}"
+            statements.append(s)
+        return "Dalam inventarisasi yang dimuat, saya menemukan: " + " ".join(statements) + " Lokasi rinci atau tingkat keparahan yang tidak tercantum tidak saya simpulkan sendiri."
+    if intent == "preservation":
+        items = []
+        for r in results[:5]:
+            raw = r["raw"]
+            priority = clean_value(raw.get("priority_source"))
+            recommendation = clean_value(raw.get("recommendation_source_text")) or r["title"]
+            items.append(f"{priority + ': ' if priority else ''}{recommendation}")
+        return "Panduan pelestarian mencatat hal-hal berikut: " + "; ".join(items) + ". Rincian metode pelaksanaan tetap perlu diperiksa pada dokumen sumber."
+    # Natural concise answer for element/document questions.
+    r = results[0]
+    raw = r["raw"]
+    facts = []
+    for label, key in [("Material", "material"), ("Finishing", "finish"), ("Lokasi", "room_location_code"), ("Bentuk", "form_description"), ("Jumlah", "quantity"), ("Signifikansi pada sumber", "significance_source_code")]:
+        val = clean_value(raw.get(key))
+        if val: facts.append(f"{label.lower()} {val}")
+    if facts: return f"Untuk **{r['title']}**, metadata mencatat " + "; ".join(facts) + "."
+    summary = next((clean_value(raw.get(k)) for k in ["dc:description", "evidence_text", "chunk_text", "definition_or_usage", "recommendation_source_text"] if clean_value(raw.get(k))), "")
+    if summary: return f"**{r['title']}**: {summary}"
+    return "Saya menemukan rekod yang mungkin relevan, tetapi isinya belum cukup untuk memberi jawaban yang pasti."
+
+
+def answer_with_openai(query: str, results: list[dict], client, model: str, qinfo: dict):
     context_blocks = []
-    for i, r in enumerate(retrieved, 1):
-        citation = f"[S{i}] {r['source_title']} | ID: {r['id']} | Sheet: {r['sheet']} | Halaman: {r['page'] or 'tidak tercantum'}"
-        context_blocks.append(citation + "\n" + r["text"])
-    context = "\n\n---\n\n".join(context_blocks)
-    system_prompt = """
-Anda adalah chatbot dokumentasi arsitektur Masjid Syuhada. Jawab dalam bahasa Indonesia yang jelas.
-Gunakan hanya informasi pada KONTEKS yang diberikan. Jangan mengarang fakta, nomor halaman, bahan,
-kondisi, penyebab kerusakan, atau rekomendasi. Jika konteks tidak cukup, katakan bahwa data belum
-ditemukan atau perlu verifikasi pada dokumen sumber. Bedakan fakta sumber dari dugaan yang ditulis
-dalam sumber. Jangan menganggap dugaan penyebab sebagai kepastian. Untuk jawaban faktual, sertakan
-sitasi [S1], [S2] sesuai konteks. Jangan memberi diagnosis struktur atau rekomendasi konservasi final
-tanpa dukungan eksplisit sumber. Jika sumber mencatat halaman "sekitar", beri tahu pengguna bahwa
-nomor halaman perlu diverifikasi.
-"""
-    user_prompt = f"PERTANYAAN:\n{query}\n\nKONTEKS SUMBER:\n{context}\n\nJawab ringkas tetapi cukup lengkap dan sertakan sitasi."
-    response = client.chat.completions.create(
-        model=model,
-        temperature=0.1,
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-    )
-    return response.choices[0].message.content or "Tidak ada jawaban yang dihasilkan."
+    for i, r in enumerate(results, 1):
+        context_blocks.append(f"[S{i}] {r['title']} | Jenis: {r['kind']} | ID: {r['id']} | Sumber: {source_label(r)}\n{r['text']}")
+    system = """Anda adalah asisten dokumentasi arsitektur Masjid Syuhada. Jawab dengan bahasa Indonesia yang natural, langsung, dan tidak kaku. Jawab pertanyaan pengguna, bukan sekadar mendaftar hasil pencarian. Gunakan hanya konteks sumber. Jangan mengarang lokasi, jumlah, material, halaman, kondisi, atau penyebab. Untuk pertanyaan jumlah, hitung hanya rekod unik yang memenuhi seluruh kriteria dan jelaskan bahwa hitungan terbatas pada workbook yang tersedia. Untuk lokasi, sebutkan lokasi hanya jika tertulis jelas; jika tidak, katakan belum tersedia. Jangan mencampur elemen yang berbeda hanya karena memiliki kata yang sama. Bedakan dugaan sumber dari fakta. Cantumkan sitasi [S1] setelah klaim yang didukung. Jika halaman tertulis 'sekitar', tandai perlu diverifikasi. Jika data tidak cukup, jelaskan secara singkat."""
+    user = f"Pertanyaan: {query}\nMaksud pertanyaan terdeteksi: {qinfo['intent']}; target: {qinfo['target'] or 'tidak spesifik'}.\nKonteks:\n" + "\n\n---\n\n".join(context_blocks) + "\n\nSusun jawaban singkat dan natural."
+    response = client.chat.completions.create(model=model, temperature=0.1, messages=[{"role":"system","content":system},{"role":"user","content":user}])
+    return response.choices[0].message.content or answer_local(query, results, qinfo)
 
-def fallback_answer(query: str, retrieved: list[dict]) -> str:
-    if not retrieved:
-        return ("Saya belum menemukan rekod yang cukup relevan dalam workbook. "
-                "Coba gunakan istilah elemen, kode, material, lokasi ruang, kerusakan, atau prioritas pelestarian yang lebih spesifik.")
-    lines = [
-        "Saya menemukan rekod berikut. Mode ini menggunakan pencarian lokal dan belum membuat jawaban generatif dari model bahasa.",
-        "",
-    ]
-    for i, r in enumerate(retrieved[:4], 1):
-        lines.append(f"{i}. **{r['title']}** ({r['kind']})")
-        lines.append(f"   - Rekod: `{r['id']}` | Sumber: {r['source_title']} | Halaman: {r['page'] or 'tidak tercantum'}")
-        # Keep answer grounded and short.
-        raw = r["raw"]
-        preferred = ["form_description", "dc:description", "damage_description",
-                     "recommendation_source_text", "chunk_text", "evidence_note",
-                     "dc:subject", "material", "finish", "priority_source"]
-        summary = next((clean_value(raw.get(k)) for k in preferred if clean_value(raw.get(k))), "")
-        if not summary:
-            summary = r["text"][:500]
-        lines.append(f"   - Informasi: {summary}")
-        lines.append(f"   - Sitasi: [S{i}]")
-    lines.append("")
-    lines.append("Catatan: rekod dengan halaman bertanda 'sekitar' perlu diperiksa kembali pada PDF asli.")
-    return "\n".join(lines)
 
 with st.sidebar:
-    st.header("Pengaturan")
+    st.header("Sumber data")
     uploaded_file = st.file_uploader("Unggah workbook metadata (.xlsx)", type=["xlsx"])
-    default_path = str(DEFAULT_XLSX)
     if uploaded_file is not None:
         temp_path = APP_DIR / "uploaded_metadata.xlsx"
         temp_path.write_bytes(uploaded_file.getvalue())
         data_path = str(temp_path)
         data_mtime = temp_path.stat().st_mtime
     elif DEFAULT_XLSX.exists():
-        data_path = default_path
-        data_mtime = DEFAULT_XLSX.stat().st_mtime
-    else:
-        data_path = ""
-        data_mtime = 0
-
-    search_mode = st.radio("Metode retrieval", ["TF-IDF (disarankan)", "Keyword"], index=0)
-    top_k = st.slider("Jumlah sumber yang dicari", min_value=2, max_value=8, value=5)
-    st.caption("TF-IDF berjalan lokal dan tidak membutuhkan API key.")
+        data_path, data_mtime = str(DEFAULT_XLSX), DEFAULT_XLSX.stat().st_mtime
+    else: data_path, data_mtime = "", 0
     st.divider()
-    st.subheader("Mode jawaban")
+    st.header("Pencarian")
+    search_mode = st.radio("Metode pencarian", ["TF-IDF", "Kata kunci"], index=0)
+    top_k = st.slider("Jumlah sumber pendukung", 2, 8, 4)
+    st.caption("Pencarian memprioritaskan kategori sesuai maksud pertanyaan, bukan hanya kemiripan kata.")
+    st.divider()
+    st.header("Penyusunan jawaban")
     client = get_openai_client()
-    use_llm = st.checkbox("Gunakan OpenAI untuk merangkai jawaban", value=bool(client))
-    model_name = st.text_input("Model OpenAI", value=os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
-    if use_llm and not client:
-        st.warning("OPENAI_API_KEY belum tersedia. Aplikasi akan memakai jawaban berbasis rekod tanpa generasi LLM.")
+    use_llm = st.checkbox("Gunakan AI untuk menyusun jawaban", value=bool(client))
+    model_name = st.text_input("Model AI", value=os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
+    if use_llm and not client: st.warning("API key belum tersedia. Aplikasi akan memakai penyusunan jawaban lokal yang lebih ringkas.")
     st.divider()
-    st.caption("Publikasikan hanya data yang memang boleh diakses publik. Jangan unggah API key ke repositori.")
+    st.caption("Untuk publikasi, pastikan metadata dan nomor halaman telah diverifikasi terhadap dokumen asli.")
 
 if not data_path:
-    st.error("File Excel default tidak ditemukan. Unggah file .xlsx melalui sidebar.")
+    st.error("Workbook Excel belum tersedia. Unggah file .xlsx pada panel kiri.")
     st.stop()
-
 try:
     records, sheet_counts, workbook_sheets = load_records(data_path, data_mtime)
 except Exception as exc:
-    st.error(f"Gagal membaca workbook Excel: {exc}")
+    st.error(f"Workbook tidak dapat dibaca: {exc}")
     st.stop()
 
-with st.sidebar:
-    st.success(f"{len(records)} rekod siap dicari")
-    with st.expander("Rincian rekod per sheet"):
-        for name, count in sheet_counts.items():
-            st.write(f"**{name}**: {count}")
-
-col1, col2, col3 = st.columns(3)
-col1.metric("Total rekod terindeks", len(records))
-col2.metric("Sheet yang diproses", len(sheet_counts))
-col3.metric("Mode pencarian", "TF-IDF" if search_mode.startswith("TF-IDF") else "Keyword")
-
-st.markdown("### Ajukan pertanyaan")
+m1, m2, m3 = st.columns(3)
+m1.metric("Rekod tersedia", len(records))
+m2.metric("Kategori data", len(sheet_counts))
+m3.metric("Mode jawaban", "AI + sumber" if use_llm and client else "Lokal + sumber")
+st.markdown("### Apa yang ingin Anda ketahui?")
+st.caption("Tanyakan dengan bahasa sehari-hari. Contoh berikut dapat dipilih untuk memulai.")
 examples = [
+    "Ada berapa rekod pintu yang mengalami retak?",
+    "Di mana lokasi elemen atap dak beton tingkat 1?",
     "Apa material atap dak beton tingkat 1?",
-    "Apa saja prioritas 1 dalam Panduan Pelestarian?",
-    "Apa kerusakan yang tercatat pada jendela?",
-    "Apa arti kode signifikansi IS?",
+    "Kerusakan apa yang tercatat pada jendela?",
+    "Apa saja yang masuk Prioritas 1 pelestarian?",
 ]
-selected_example = st.selectbox("Contoh pertanyaan", ["Pilih contoh..."] + examples)
-default_question = "" if selected_example == "Pilih contoh..." else selected_example
-
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+selected_example = st.selectbox("Contoh pertanyaan", ["Pilih contoh pertanyaan..."] + examples, label_visibility="collapsed")
+if "messages" not in st.session_state: st.session_state.messages = []
+if st.button("Mulai percakapan baru", use_container_width=False): st.session_state.messages = []; st.rerun()
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         if msg.get("sources"):
-            with st.expander("Lihat sumber yang digunakan"):
-                for src in msg["sources"]:
-                    st.markdown(
-                        f"**{src['title']}**  \n"
-                        f"Jenis: {src['kind']} · ID: `{src['id']}`  \n"
-                        f"Sumber: {src['source_title']} · Halaman: {src['page'] or 'tidak tercantum'}"
-                    )
-                    st.caption(f"Sheet: {src['sheet']} | Kode: {src['code'] or '-'} | Lokasi: {src['location'] or '-'}")
+            with st.expander(f"Sumber pendukung ({len(msg['sources'])})"):
+                for i, src in enumerate(msg["sources"], 1):
+                    st.markdown(f"**[S{i}] {src['title']}**  \n{src['source_title']} · ID `{src['id']}` · Halaman {src['page'] or 'tidak tercantum'}")
+                    st.caption(f"Kategori: {src['kind']} · Lokasi: {src['location'] or 'tidak tercantum'} · Status halaman: {src['page_status']}")
 
-question = st.chat_input("Tulis pertanyaan tentang elemen, kerusakan, atau pelestarian...")
-if question is None and default_question:
-    if st.button("Gunakan contoh pertanyaan"):
-        question = default_question
+question = st.chat_input("Contoh: Apa yang tercatat tentang kerusakan pintu?")
+if question is None and selected_example != "Pilih contoh pertanyaan...":
+    if st.button("Tanyakan contoh ini"): question = selected_example
 
 if question:
     st.session_state.messages.append({"role": "user", "content": question})
-    with st.chat_message("user"):
-        st.markdown(question)
-
-    method = "Keyword" if search_mode == "Keyword" else "TF-IDF"
-    with st.spinner("Mencari rekod yang relevan..."):
-        results = retrieve(question, records, top_k, method)
+    with st.chat_message("user"): st.markdown(question)
+    with st.spinner("Memeriksa metadata dan memilih sumber yang relevan..."):
+        results, qinfo = retrieve(question, records, top_k, "Keyword" if search_mode == "Kata kunci" else "TF-IDF")
         if use_llm and client and results:
-            try:
-                answer = answer_with_openai(question, results, client, model_name)
-            except Exception as exc:
-                answer = fallback_answer(question, results)
-                st.warning(f"OpenAI tidak berhasil digunakan. Menampilkan hasil pencarian lokal. Detail: {exc}")
-        else:
-            answer = fallback_answer(question, results)
-
-    sources = [{
-        "id": r["id"], "title": r["title"], "kind": r["kind"],
-        "source_title": r["source_title"], "page": r["page"],
-        "sheet": r["sheet"], "code": r["code"], "location": r["location"],
-        "score": round(float(r["score"]), 4),
-    } for r in results]
-
+            try: answer = answer_with_openai(question, results, client, model_name, qinfo)
+            except Exception: answer = answer_local(question, results, qinfo)
+        else: answer = answer_local(question, results, qinfo)
+    sources = []
+    for r in results:
+        sources.append({"id": r["id"], "title": r["title"], "kind": r["kind"], "source_title": r["source_title"], "page": r["page"], "sheet": r["sheet"], "code": r["code"], "location": r["location"], "page_status": "perlu verifikasi" if "sekitar" in (r["page"] or "").lower() else "tercantum", "score": round(r["score"], 3)})
     with st.chat_message("assistant"):
+        st.markdown('<div class="answer-box">', unsafe_allow_html=True)
         st.markdown(answer)
+        st.markdown('</div>', unsafe_allow_html=True)
         if sources:
-            with st.expander("Sumber yang ditemukan", expanded=True):
+            with st.expander(f"Periksa sumber jawaban ({len(sources)})", expanded=True):
                 for i, src in enumerate(sources, 1):
-                    st.markdown(
-                        f"**[S{i}] {src['title']}**  \n"
-                        f"Jenis: {src['kind']} · ID: `{src['id']}` · Sheet: `{src['sheet']}`  \n"
-                        f"Sumber: {src['source_title']} · Halaman: {src['page'] or 'tidak tercantum'}"
-                    )
-                    st.caption(f"Skor retrieval: {src['score']} | Kode: {src['code'] or '-'} | Lokasi: {src['location'] or '-'}")
+                    st.markdown(f"<div class='source-box'><div class='source-title'>[S{i}] {html.escape(src['title'])}</div><div>{html.escape(src['source_title'])}</div><div class='muted'>ID: {html.escape(src['id'])} · Halaman: {html.escape(src['page'] or 'tidak tercantum')} · {html.escape(src['kind'])}</div></div>", unsafe_allow_html=True)
+                    if src["page_status"] == "perlu verifikasi": st.caption("Catatan: nomor halaman pada metadata bersifat perkiraan dan perlu dicek pada PDF asli.")
     st.session_state.messages.append({"role": "assistant", "content": answer, "sources": sources})
 
-st.divider()
-with st.expander("Tentang data dan keterbatasan"):
-    st.write(
-        "Aplikasi ini membaca workbook metadata Dublin Core dan mencari rekod dari sheet dokumen, "
-        "elemen arsitektur, inventarisasi kerusakan, panduan pelestarian, chunk RAG, pemetaan Dublin Core, "
-        "dan kosakata terkendali. Retrieval default memakai TF-IDF. Jika OPENAI_API_KEY tersedia dan "
-        "opsi OpenAI diaktifkan, hasil pencarian dipakai sebagai konteks untuk menyusun jawaban. "
-        "Kualitas jawaban dibatasi oleh kelengkapan workbook. Rekod contoh dan nomor halaman yang belum pasti "
-        "harus diverifikasi sebelum publikasi sebagai sumber resmi."
-    )
+with st.expander("Tentang sumber dan batasan jawaban"):
+    st.write("Jawaban disusun dari workbook metadata yang diunggah atau disertakan bersama aplikasi. Hasil pencarian bukan pengganti pemeriksaan dokumen asli. Jumlah yang disebutkan hanya menghitung rekod yang tersedia di workbook. Jika lokasi, halaman, atau detail kerusakan tidak tercatat, aplikasi akan menyatakannya secara terbuka.")
